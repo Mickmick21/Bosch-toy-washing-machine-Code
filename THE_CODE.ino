@@ -52,6 +52,12 @@ int play_jingle[] = {
 int end_jingle[] = {
   NOTE_D6, NOTE_A5, NOTE_E6, NOTE_A6, 0, NOTE_E6, NOTE_D6, NOTE_A5, NOTE_A5, NOTE_E6, NOTE_A6
 };
+int off_jingle[] = {
+  NOTE_E6, NOTE_A6, NOTE_A5
+};
+int error_jingle[] = {
+  NOTE_A5, NOTE_A5
+};
 int noteDurations[] = {
   4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
 };
@@ -134,6 +140,13 @@ void setup() {
     ecranOLED.clearDisplay();
     Serial.println("E4");
     for (int i = 0; i <= 5; i++) {
+      for (int thisNote = 0; thisNote < 3; thisNote++) {
+        int noteDuration = 1000 / jingleDurations[thisNote];
+        tone(11, error_jingle[thisNote], noteDuration);
+        int pauseBetweenNotes = noteDuration * 1.30;
+        delay(pauseBetweenNotes);
+        noTone(11);
+      }
       ecranOLED.setTextSize(1);
       ecranOLED.setTextColor(WHITE);
       ecranOLED.setCursor(0, 0);
@@ -142,7 +155,6 @@ void setup() {
       delay(500);
       ecranOLED.clearDisplay();
       ecranOLED.display();
-      delay(600);
     }
     EEPROM.write(1, 0);
   }
@@ -268,14 +280,14 @@ void loop() {
     ecranOLED.setTextSize(1);
     ecranOLED.setTextColor(WHITE);
     ecranOLED.setCursor(0, 0);
-    ecranOLED.println("Auto Soft");
+    ecranOLED.println("Soft");
     ecranOLED.display();
   } else if (encoderPos == 17) {
     ecranOLED.clearDisplay();
     ecranOLED.setTextSize(1);
     ecranOLED.setTextColor(WHITE);
     ecranOLED.setCursor(0, 0);
-    ecranOLED.println("Auto");
+    ecranOLED.println("Nettoyage tambour");
     ecranOLED.display();
   } else if (encoderPos >= 18) {
     ecranOLED.clearDisplay();
@@ -337,8 +349,8 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         wash();
         drain();
         interim_spin();
-        final_spin();
         final_spin_speed_up();
+        final_spin();
         final_spin_slow_down();
         End();
       }
@@ -350,7 +362,14 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.setCursor(0, 0);
         ecranOLED.println("Cotton ECO");
         ecranOLED.display();
-        not_finished();
+        start();
+        wash();
+        drain();
+        interim_spin();
+        final_spin();
+        final_spin();
+        final_spin_slow_down();
+        End();
       }
       if (Mode == 3) {
         Serial.println("Easy Care");  //DEBUGGING: print which mode has been selected
@@ -360,7 +379,16 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.setCursor(0, 0);
         ecranOLED.println("Easy Care");
         ecranOLED.display();
-        not_finished();
+        start();
+        wash();
+        drain();
+        wash();
+        drain();
+        interim_spin();
+        final_spin_speed_up();
+        final_spin();
+        final_spin_slow_down();
+        End();
       }
       if (Mode == 4) {
         Serial.println("Schnell/Mix");  //DEBUGGING: print which mode has been selected
@@ -370,7 +398,16 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.setCursor(0, 0);
         ecranOLED.println("Schnell/Mix");
         ecranOLED.display();
-        not_finished();
+        start();
+        wash();
+        drain();
+        wash();
+        drain();
+        interim_spin();
+        final_spin_speed_up();
+        final_spin();
+        final_spin_slow_down();
+        End();
       }
       if (Mode == 5) {
         Serial.println("Chargement mixe");  //DEBUGGING: print which mode has been selected
@@ -380,7 +417,15 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.setCursor(0, 0);
         ecranOLED.println("Chargement mixe");
         ecranOLED.display();
-        bi_toss_wash();
+        start();
+        wash();
+        drain();
+        wash();
+        drain();
+        interim_spin();
+        final_spin_speed_up();
+        final_spin();
+        final_spin_slow_down();
         End();
       }
       if (Mode == 6) {
@@ -420,10 +465,9 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Essorage");
         ecranOLED.display();
         start();
-        ;
         interim_spin();
-        final_spin();
         final_spin_speed_up();
+        final_spin();
         final_spin_slow_down();
         End();
       }
@@ -439,8 +483,8 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         wash();
         drain();
         interim_spin();
-        final_spin();
         final_spin_speed_up();
+        final_spin();
         final_spin_slow_down();
         End();
       }
@@ -452,7 +496,16 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.setCursor(0, 0);
         ecranOLED.println("Lavage Sportif");
         ecranOLED.display();
-        not_finished();
+        start();
+        wash();
+        drain();
+        wash();
+        drain();
+        interim_spin();
+        final_spin_speed_up();
+        final_spin();
+        final_spin_slow_down();
+        End();
       }
       if (Mode == 14) {
         Serial.println("AllergiePlus");  //DEBUGGING: print which mode has been selected
@@ -462,7 +515,16 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.setCursor(0, 0);
         ecranOLED.println("Allergie +");
         ecranOLED.display();
-        not_finished();
+        start();
+        wash();
+        drain();
+        wash();
+        drain();
+        interim_spin();
+        final_spin_speed_up();
+        final_spin();
+        final_spin_slow_down();
+        End();
       }
       if (Mode == 15) {
         Serial.println("Easycare +");  //DEBUGGING: print which mode has been selected
@@ -472,27 +534,49 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.setCursor(0, 0);
         ecranOLED.println("Easycare +");
         ecranOLED.display();
-        not_finished();
+        start();
+        wash();
+        drain();
+        wash();
+        drain();
+        interim_spin();
+        final_spin_speed_up();
+        final_spin();
+        final_spin_slow_down();
+        End();
       }
       if (Mode == 16) {
-        Serial.println("Auto Soft");  //DEBUGGING: print which mode has been selected
+        Serial.println("Soft");  //DEBUGGING: print which mode has been selected
         ecranOLED.clearDisplay();
         ecranOLED.setTextSize(2);
         ecranOLED.setTextColor(WHITE);
         ecranOLED.setCursor(0, 0);
-        ecranOLED.println("Auto Soft");
+        ecranOLED.println("Soft");
         ecranOLED.display();
-        not_finished();
+        start();
+        uni_toss_wash();
+        bi_toss_wash();
+        wool_wash();
+        wool_drain();
+        uni_toss_wash();
+        bi_toss_wash();
+        End();
       }
       if (Mode == 17) {
-        Serial.println("Auto");  //DEBUGGING: print which mode has been selected
+        Serial.println("Netoyage Tambour");  //DEBUGGING: print which mode has been selected
         ecranOLED.clearDisplay();
         ecranOLED.setTextSize(2);
         ecranOLED.setTextColor(WHITE);
         ecranOLED.setCursor(0, 0);
-        ecranOLED.println("Auto");
+        ecranOLED.println("Netoyage Tambour");
         ecranOLED.display();
-        unknown_error();
+        start();
+        wash();
+        wool_wash();
+        bi_toss_wash();
+        uni_toss_wash();
+        drain();
+        End();
       }
     }
   }
@@ -511,7 +595,7 @@ void start() {
 }
 void uni_toss_wash() {
   for (int i = 0; i <= 12; i++) {
-    analogWrite(enA, 30);
+    analogWrite(enA, 40);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(350);
@@ -526,7 +610,7 @@ void uni_toss_wash() {
 }
 void wash() {
   for (int i = 0; i <= 3; i++) {
-    analogWrite(enA, 30);
+    analogWrite(enA, 40;
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(10000);
@@ -545,7 +629,7 @@ void wash() {
 }
 void wool_wash() {
   for (int i = 0; i <= 40; i++) {
-    analogWrite(enA, 35);
+    analogWrite(enA, 35;
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(300);
@@ -573,7 +657,7 @@ void drain() {
   digitalWrite(in3, HIGH);
   digitalWrite(in4, LOW);
   delay(10000);
-  analogWrite(enA, 30);  //ENB pin
+  analogWrite(enA, 35);  //ENB pin
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
   delay(2000);
@@ -603,7 +687,7 @@ void drain() {
 }
 void bi_toss_wash() {
   for (int i = 0; i <= 11; i++) {
-    analogWrite(enA, 30);
+    analogWrite(enA, 40);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(450);
@@ -686,18 +770,18 @@ void final_spin() {
   digitalWrite(in3, HIGH);
   digitalWrite(in4, LOW);
   if (true) {
-    for (int i = 0; i <= 255; i++) {
+    for (int i = 181; i <= 255; i++) {
       analogWrite(10, i);
       delay(150);
     }
 
   } else if (spin_counter == 0) {
-    for (int i = 0; i <= 210; i++) {
+    for (int i = 182; i <= 210; i++) {
       analogWrite(10, i);
       delay(150);
     }
   } else if (spin_counter == 1) {
-    for (int i = 0; i <= 220; i++) {
+    for (int i = 182; i <= 220; i++) {
       analogWrite(10, i);
       delay(150);
     }
@@ -739,12 +823,29 @@ void End() {
     noTone(11);
   }
   delay(7500);
+  ecranOLED.clearDisplay();
+  ecranOLED.display();
+  for (int thisNote = 0; thisNote < 3; thisNote++) {
+    int noteDuration = 1000 / jingleDurations[thisNote];
+    tone(11, off_jingle[thisNote], noteDuration);
+    int pauseBetweenNotes = noteDuration * 1.30;
+    delay(pauseBetweenNotes);
+    noTone(11);
+  }
+  delay(3500);
   resetFunc();  //call reset
 }
 void not_finished() {
   Serial.println("E3");
   ecranOLED.clearDisplay();
   for (int i = 0; i <= 5; i++) {
+    for (int thisNote = 0; thisNote < 3; thisNote++) {
+      int noteDuration = 1000 / jingleDurations[thisNote];
+      tone(11, error_jingle[thisNote], noteDuration);
+      int pauseBetweenNotes = noteDuration * 1.30;
+      delay(pauseBetweenNotes);
+      noTone(11);
+    }
     ecranOLED.setTextSize(1);
     ecranOLED.setTextColor(WHITE);
     ecranOLED.setCursor(0, 0);
@@ -753,7 +854,6 @@ void not_finished() {
     delay(500);
     ecranOLED.clearDisplay();
     ecranOLED.display();
-    delay(600);
   }
   resetFunc();  //call reset
 }
@@ -761,6 +861,13 @@ void unknown_error() {
   Serial.println("EU");
   ecranOLED.clearDisplay();
   for (int i = 0; i <= 7; i++) {
+    for (int thisNote = 0; thisNote < 3; thisNote++) {
+      int noteDuration = 1000 / jingleDurations[thisNote];
+      tone(11, error_jingle[thisNote], noteDuration);
+      int pauseBetweenNotes = noteDuration * 1.30;
+      delay(pauseBetweenNotes);
+      noTone(11);
+    }
     ecranOLED.setTextSize(1);
     ecranOLED.setTextColor(WHITE);
     ecranOLED.setCursor(0, 0);
@@ -769,7 +876,6 @@ void unknown_error() {
     delay(500);
     ecranOLED.clearDisplay();
     ecranOLED.display();
-    delay(600);
   }
   resetFunc();  //call reset
 }
