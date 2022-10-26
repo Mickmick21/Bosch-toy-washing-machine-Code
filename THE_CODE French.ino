@@ -8,9 +8,10 @@
   /*in1/2/enA = motor 1 ,in3/4/enB = pump*/
 // Rotary encoder declarations
 #include <EEPROM.h>
+char welcome_msg[] = "Bienvenue, sample!"; // the welcome text after the logo (and error) put whatever you want here
+static int welcome_text_size = 1; //  change this if it is too big or too small
 void (*resetFunc)(void) = 0;  //declare reset function at address 0
-int spin_counter = 0;
-int spin_speed = 1200;
+int spin_speed = EEPROM.read(3);
 static int pinA = 2;                        // Our first hardware interrupt pin is digital pin 2
 static int pinB = 3;                        // Our second hardware interrupt pin is digital pin 3
 volatile byte aFlag = 0;                    // let's us know when we're expecting a rising edge on pinA to signal that the encoder has arrived at a detent
@@ -27,21 +28,8 @@ boolean buttonPressed = 0;              // a flag variable
 // Menu and submenu/setting declarations
 byte Mode = 0;            // This is which menu mode we are in at any given time (top level or one of the submenus)
 const byte modeMax = 19;  // This is the number of submenus/settings you want
-byte setting1 = 0;        // a variable which holds the value we set
-byte setting2 = 0;        // a variable which holds the value we set
-byte setting3 = 0;        // a variable which holds the value we set
-/* Note: you may wish to change settingN etc to int, float or boolean to suit your application.
-  Remember to change "void setAdmin(byte name,*BYTE* setting)" to match and probably add some
-  "modeMax"-type overflow code in the "if(Mode == N && buttonPressed)" section*/
 #include <Adafruit_SSD1306.h>
 Adafruit_SSD1306 ecranOLED(128, 32, &Wire, -1);
-// Motor A connections
-int enA = 10;
-int in1 = 9;
-int in2 = 8;
-int enB = 5;
-int in3 = 7;
-int in4 = 6;
 #include "pitches.h"
 int start_jingle[] = {
   NOTE_D6, NOTE_A5, NOTE_A6
@@ -56,7 +44,7 @@ int off_jingle[] = {
   NOTE_E6, NOTE_A6, NOTE_A5
 };
 int error_jingle[] = {
-  NOTE_A5, NOTE_A5
+  NOTE_A5, NOTE_A6
 };
 int noteDurations[] = {
   4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
@@ -113,12 +101,10 @@ void setup() {
   // DEBUGGING section of setup
   Serial.begin(9600);  // DEBUGGING: opens serial port, sets data rate to 9600 bps
   ecranOLED.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  pinMode(enA, OUTPUT);
-  pinMode(in1, OUTPUT);
-  pinMode(in2, OUTPUT);
-  pinMode(enB, OUTPUT);
-  pinMode(in3, OUTPUT);
-  pinMode(in4, OUTPUT);
+  pinMode(A0, OUTPUT);
+  pinMode(A1, OUTPUT);
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH);
   ecranOLED.clearDisplay();
   ecranOLED.drawBitmap(
     (ecranOLED.width() - largeurDeLimage) / 2,   // Position de l'extrême "gauche" de l'image (pour centrage écran, ici)
@@ -158,6 +144,13 @@ void setup() {
     }
     EEPROM.write(1, 0);
   }
+  ecranOLED.clearDisplay();
+    ecranOLED.setTextSize(welcome_text_size);
+    ecranOLED.setTextColor(WHITE);
+    ecranOLED.setCursor(0, 0);
+    ecranOLED.println(welcome_msg);
+    ecranOLED.display();
+    delay(3000);
 }
 
 
@@ -231,7 +224,7 @@ void loop() {
     ecranOLED.setTextSize(1);
     ecranOLED.setTextColor(WHITE);
     ecranOLED.setCursor(0, 0);
-    ecranOLED.println("Selectionnez votre programme");
+    ecranOLED.println("Vitesse de l'essorage");
     ecranOLED.display();
   } else if (encoderPos == 10) {
     ecranOLED.clearDisplay();
@@ -344,7 +337,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Cotton");
         ecranOLED.display();
         start();
-        wash();
+        regular_wash();
         drain();
         wash();
         drain();
@@ -380,7 +373,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Easy Care");
         ecranOLED.display();
         start();
-        wash();
+        regular_wash();
         drain();
         wash();
         drain();
@@ -399,7 +392,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Schnell/Mix");
         ecranOLED.display();
         start();
-        wash();
+        regular_wash();
         drain();
         wash();
         drain();
@@ -418,7 +411,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Chargement mixe");
         ecranOLED.display();
         start();
-        wash();
+        regular_wash();
         drain();
         wash();
         drain();
@@ -455,6 +448,42 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         initial_drain();
         drain();
         End();
+      }
+      if (Mode == 9) {
+        if (encoderPos == 9) {
+          EEPROM.write(3, 230);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Vitesse: 800");
+          ecranOLED.display();
+          Serial.println("Vitesse: 800");
+          delay(5000);
+        }
+        if (encoderPos == 10) {
+          EEPROM.write(3, 240);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Vitesse: 1000");
+          ecranOLED.display();
+          Serial.println("Vitesse: 1000");
+          delay(5000);
+        }
+        if (encoderPos == 11) {
+          EEPROM.write(3, 255);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Vitesse: 1200");
+          ecranOLED.display();
+          Serial.println("Vitesse: 1200");
+          delay(5000);
+        }
+        resetFunc();  //call reset
       }
       if (Mode == 11) {
         Serial.println("Essorage");  //DEBUGGING: print which mode has been selected
@@ -497,7 +526,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Lavage Sportif");
         ecranOLED.display();
         start();
-        wash();
+        regular_wash();
         drain();
         wash();
         drain();
@@ -516,7 +545,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Allergie +");
         ecranOLED.display();
         start();
-        wash();
+        regular_wash();
         drain();
         wash();
         drain();
@@ -535,7 +564,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Easycare +");
         ecranOLED.display();
         start();
-        wash();
+        regular_wash();
         drain();
         wash();
         drain();
@@ -554,6 +583,7 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Soft");
         ecranOLED.display();
         start();
+        regular_wash();
         uni_toss_wash();
         bi_toss_wash();
         wool_wash();
@@ -593,6 +623,14 @@ void start() {
   EEPROM.write(1, 1);
   delay(1000);
 }
+void fill() {
+  analogWrite(pump)
+  digitalWrite(pump1in1, HIGH);
+  digitalWrite(fill_pump2, LOW);
+  delay(60000);
+  digitalWrite(fill_pump1, LOW);
+  digitalWrite(fill_pump2, LOW);
+}
 void uni_toss_wash() {
   for (int i = 0; i <= 12; i++) {
     analogWrite(enA, 40);
@@ -610,7 +648,7 @@ void uni_toss_wash() {
 }
 void wash() {
   for (int i = 0; i <= 3; i++) {
-    analogWrite(enA, 40;
+    analogWrite(enA, 40);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(10000);
@@ -627,9 +665,27 @@ void wash() {
   digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
 }
+void regular_wash() {
+  // 1 minute
+  for (int i = 0; i <= 1; i++) {
+    analogWrite(10, 55);
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2, LOW);
+    delay(10000);
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+    delay(5000);
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, HIGH);
+    delay(10000);
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+    delay(5000);
+  }
+}
 void wool_wash() {
   for (int i = 0; i <= 40; i++) {
-    analogWrite(enA, 35;
+    analogWrite(enA, 35);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(300);
@@ -657,7 +713,7 @@ void drain() {
   digitalWrite(in3, HIGH);
   digitalWrite(in4, LOW);
   delay(10000);
-  analogWrite(enA, 35);  //ENB pin
+  analogWrite(enA, 35);
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
   delay(2000);
@@ -745,7 +801,7 @@ void interim_spin() {
     delay(100);
   }
   delay(19900);
-  for (int i = 1; i <= 255; i++) {
+  for (int i = 1; i <= 230; i++) {
     analogWrite(10, 255 - i);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
@@ -756,7 +812,6 @@ void interim_spin() {
 }
 
 void final_spin_speed_up() {
-  int spin = 1200;
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
   for (int i = 80; i <= 180; i++) {
@@ -769,43 +824,20 @@ void final_spin_speed_up() {
 void final_spin() {
   digitalWrite(in3, HIGH);
   digitalWrite(in4, LOW);
-  if (true) {
-    for (int i = 181; i <= 255; i++) {
-      analogWrite(10, i);
-      delay(150);
-    }
-
-  } else if (spin_counter == 0) {
-    for (int i = 182; i <= 210; i++) {
-      analogWrite(10, i);
-      delay(150);
-    }
-  } else if (spin_counter == 1) {
-    for (int i = 182; i <= 220; i++) {
-      analogWrite(10, i);
-      delay(150);
-    }
+  for (int i = 181; i <= EEPROM.read(3); i++) {
+    analogWrite(10, i);
+    delay(150);
   }
 }
 void final_spin_slow_down() {
-  if (true) {
-    for (int i = 0; i <= 255; i++) {
-      analogWrite(10, 255 - i);
-      delay(120);
-    }
-  } else if (spin_counter == 0) {
-    for (int i = 0; i <= 210; i++) {
-      analogWrite(10, 255 - i);
-      delay(120);
-    }
-  } else if (spin_counter == 1) {
-    for (int i = 0; i <= 220; i++) {
-      analogWrite(10, 255 - i);
-      delay(120);
-    }
+  for (int i = 0; i <= EEPROM.read(3); i++) {
+    analogWrite(10, 255 - i);
+    delay(120);
   }
   digitalWrite(in3, LOW);
   digitalWrite(in4, LOW);
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
 }
 void End() {
   EEPROM.write(1, 0);
