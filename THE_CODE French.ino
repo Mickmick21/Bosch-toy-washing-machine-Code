@@ -1,17 +1,18 @@
 /*********Bosch Serie 8 toy washing machine Mod**********
   by @Giacgiac21, @Mickmick2012, @Wishy Washer
   Original idea by @Mickmick2012 and @Wishy Washer
-  @Mickmick2012: https://www.youtube.com/channel/UCeqR3VP9sD_Yg3V-uurZH5w
+  @Mickmick2012 (a.k.a Michelangelo Chaume): https://www.youtube.com/channel/UCeqR3VP9sD_Yg3V-uurZH5w
   @Wishy Washer: https://www.youtube.com/channel/UCUahB2ZOtE1biDp3gDAiZVA
   @Giacgiac21: https://www.youtube.com/channel/UC6KFaBeQQt-3KtYDCugNKiA
-  0.1.0
-  /*in1/2/enA = motor 1 ,in3/4/enB = pump*/
+  0.5.4 Beta Build
+  /*in1/2/enA = motor 1*/
 // Rotary encoder declarations
 #include <EEPROM.h>
-char welcome_msg[] = "Bienvenue, sample!"; // the welcome text after the logo (and error) put whatever you want here
-static int welcome_text_size = 1; //  change this if it is too big or too small
-void (*resetFunc)(void) = 0;  //declare reset function at address 0
+char welcome_msg[] = "Bienvenue, sample!";  // the welcome text after the logo (and error) put whatever you want here
+static int welcome_text_size = 1;           //  change this if it is too big or too small
+void (*resetFunc)(void) = 0;                //declare reset function at address 0
 int spin_speed = EEPROM.read(3);
+unsigned long start_delay = 0;              //
 static int pinA = 2;                        // Our first hardware interrupt pin is digital pin 2
 static int pinB = 3;                        // Our second hardware interrupt pin is digital pin 3
 volatile byte aFlag = 0;                    // let's us know when we're expecting a rising edge on pinA to signal that the encoder has arrived at a detent
@@ -19,18 +20,23 @@ volatile byte bFlag = 0;                    // let's us know when we're expectin
 volatile byte encoderPos = EEPROM.read(0);  //this variable stores our current value of encoder position. Change to int or uin16_t instead of byte if you want to record a larger range than 0-255
 volatile byte oldEncPos = 0;                //stores the last encoder position value so we can compare to the current reading and see if it has changed (so we know when to print to the serial monitor)
 volatile byte reading = 0;                  //somewhere to store the direct values we read from our interrupt pins before checking to see if we have moved a whole detent
+int spk = 11;                               //speaker pin
 // Button reading, including debounce without delay function declarations
 const byte buttonPin = 4;               // this is the Arduino pin we are connecting the push button to
 byte oldButtonState = HIGH;             // assume switch open because of pull-up resistor
 const unsigned long debounceTime = 10;  // milliseconds
 unsigned long buttonPressTime;          // when the switch last changed state
 boolean buttonPressed = 0;              // a flag variable
+int dots = 0;
 // Menu and submenu/setting declarations
 byte Mode = 0;            // This is which menu mode we are in at any given time (top level or one of the submenus)
 const byte modeMax = 19;  // This is the number of submenus/settings you want
 #include <Adafruit_SSD1306.h>
 Adafruit_SSD1306 ecranOLED(128, 32, &Wire, -1);
 #include "pitches.h"
+int enA = 5;  //Power for the motor
+int in1 = 6;  //Direction 1
+int in2 = 7;  //Direction 2
 int start_jingle[] = {
   NOTE_D6, NOTE_A5, NOTE_A6
 };
@@ -44,7 +50,7 @@ int off_jingle[] = {
   NOTE_E6, NOTE_A6, NOTE_A5
 };
 int error_jingle[] = {
-  NOTE_A5, NOTE_A6
+  NOTE_A5, NOTE_A5
 };
 int noteDurations[] = {
   4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
@@ -88,12 +94,89 @@ const unsigned char logo[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
+// 'path12691', 128x32px
+const unsigned char epd_bitmap_path12691[] PROGMEM = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xf0,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x0c,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x06,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x03,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0xf0,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x41, 0x08,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x04,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0xc2,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x43, 0xc2,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x41, 0x82,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x02,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x04,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0c,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x18,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe0,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+// 'path12811', 128x32px
+const unsigned char epd_bitmap_path12811[] PROGMEM = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x80,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x40,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x38,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x04,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7f, 0xff,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x02,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x02,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x02,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x04,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0xf8,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+
+
 
 
 void setup() {
   //Rotary encoder section of setup
-  pinMode(pinA, INPUT_PULLUP);       // set pinA as an input, pulled HIGH to the logic voltage (5V or 3.3V for most cases)
-  pinMode(pinB, INPUT_PULLUP);       // set pinB as an input, pulled HIGH to the logic voltage (5V or 3.3V for most cases)
+  pinMode(pinA, INPUT_PULLUP);  // set pinA as an input, pulled HIGH to the logic voltage (5V or 3.3V for most cases)
+  pinMode(pinB, INPUT_PULLUP);  // set pinB as an input, pulled HIGH to the logic voltage (5V or 3.3V for most cases)
+  pinMode(enA, OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
   attachInterrupt(0, PinA, RISING);  // set an interrupt on PinA, looking for a rising edge signal and executing the "PinA" Interrupt Service Routine (below)
   attachInterrupt(1, PinB, RISING);  // set an interrupt on PinB, looking for a rising edge signal and executing the "PinB" Interrupt Service Routine (below)
   // button section of setup
@@ -101,6 +184,20 @@ void setup() {
   // DEBUGGING section of setup
   Serial.begin(9600);  // DEBUGGING: opens serial port, sets data rate to 9600 bps
   ecranOLED.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  if (EEPROM.read(5) == 0) {
+    start_delay = 0;
+  } else if (EEPROM.read(5) == 1) {
+    start_delay = 3600000;
+  } else if (EEPROM.read(5) == 2) {
+    start_delay = 7200000;
+  } else if (EEPROM.read(5) == 3) {
+    start_delay = 10800000;
+  } else if (EEPROM.read(5) == 4) {
+    start_delay = 14400000;
+  } else if (EEPROM.read(5) == 5) {
+    start_delay = 1800000;
+  }
+  Serial.println(start_delay);
   pinMode(A0, OUTPUT);
   pinMode(A1, OUTPUT);
   pinMode(13, OUTPUT);
@@ -114,43 +211,47 @@ void setup() {
     hauteurDeLimage,
     WHITE);
   ecranOLED.display();
-  for (int thisNote = 0; thisNote < 3; thisNote++) {
-    int noteDuration = 1000 / jingleDurations[thisNote];
-    tone(11, start_jingle[thisNote], noteDuration);
-    int pauseBetweenNotes = noteDuration * 1.30;
-    delay(pauseBetweenNotes);
-    noTone(11);
+  if (EEPROM.read(6) == 0) {
+    for (int thisNote = 0; thisNote < 3; thisNote++) {
+      int noteDuration = 1000 / jingleDurations[thisNote];
+      tone(spk, start_jingle[thisNote], noteDuration);
+      int pauseBetweenNotes = noteDuration * 1.30;
+      delay(pauseBetweenNotes);
+      noTone(spk);
+    }
   }
   delay(2500);
   if (EEPROM.read(1) == 1) {
     ecranOLED.clearDisplay();
     Serial.println("E4");
-    for (int i = 0; i <= 5; i++) {
-      for (int thisNote = 0; thisNote < 3; thisNote++) {
-        int noteDuration = 1000 / jingleDurations[thisNote];
-        tone(11, error_jingle[thisNote], noteDuration);
-        int pauseBetweenNotes = noteDuration * 1.30;
-        delay(pauseBetweenNotes);
-        noTone(11);
+    if (EEPROM.read(6) == 0) {
+      for (int i = 0; i <= 5; i++) {
+        for (int thisNote = 0; thisNote < 3; thisNote++) {
+          int noteDuration = 1000 / jingleDurations[thisNote];
+          tone(spk, error_jingle[thisNote], noteDuration);
+          int pauseBetweenNotes = noteDuration * 1.30;
+          delay(pauseBetweenNotes);
+          noTone(spk);
+        }
+        ecranOLED.setTextSize(1);
+        ecranOLED.setTextColor(WHITE);
+        ecranOLED.setCursor(0, 0);
+        ecranOLED.println("E4 - Le programme a été interrompu par arret de courant");
+        ecranOLED.display();
+        delay(500);
+        ecranOLED.clearDisplay();
+        ecranOLED.display();
       }
-      ecranOLED.setTextSize(1);
-      ecranOLED.setTextColor(WHITE);
-      ecranOLED.setCursor(0, 0);
-      ecranOLED.println("E4 - Le programme a été interrompu par arret de courant");
-      ecranOLED.display();
-      delay(500);
-      ecranOLED.clearDisplay();
-      ecranOLED.display();
     }
-    EEPROM.write(1, 0);
   }
+  EEPROM.write(1, 0);
   ecranOLED.clearDisplay();
-    ecranOLED.setTextSize(welcome_text_size);
-    ecranOLED.setTextColor(WHITE);
-    ecranOLED.setCursor(0, 0);
-    ecranOLED.println(welcome_msg);
-    ecranOLED.display();
-    delay(3000);
+  ecranOLED.setTextSize(welcome_text_size);
+  ecranOLED.setTextColor(WHITE);
+  ecranOLED.setCursor(0, 0);
+  ecranOLED.println(welcome_msg);
+  ecranOLED.display();
+  delay(3000);
 }
 
 
@@ -337,14 +438,21 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Cotton");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         wash();
-        drain();
+        dots = 3;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 4;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 2) {
@@ -356,12 +464,18 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Cotton ECO");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         interim_spin();
         final_spin();
         final_spin();
         final_spin_slow_down();
+        dots = 3;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 3) {
@@ -373,14 +487,21 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Easy Care");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         wash();
-        drain();
+        dots = 3;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 4;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 4) {
@@ -392,14 +513,21 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Schnell/Mix");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         wash();
-        drain();
+        dots = 3;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 4;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 5) {
@@ -411,14 +539,21 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Chargement mixe");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         wash();
-        drain();
+        dots = 3;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 4;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 6) {
@@ -430,10 +565,18 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Laine");
         ecranOLED.display();
         start();
+        dots = 1;
+        ecranOLED.drawBitmap(
+          (ecranOLED.width() - largeurDeLimage) / 2,   // Position de l'extrême "gauche" de l'image (pour centrage écran, ici)
+          (ecranOLED.height() - hauteurDeLimage) / 2,  // Position de l'extrême "haute" de l'image (pour centrage écran, ici)
+          epd_bitmap_path12811,
+          largeurDeLimage,
+          hauteurDeLimage,
+          WHITE);
+        refresh_steps();
         wool_wash();
         wool_wash();
         wool_wash();
-        wool_drain();
         End();
       }
       if (Mode == 7) {
@@ -445,8 +588,6 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Vider Tambour");
         ecranOLED.display();
         start();
-        initial_drain();
-        drain();
         End();
       }
       if (Mode == 9) {
@@ -485,6 +626,75 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         }
         resetFunc();  //call reset
       }
+      if (Mode == 10) {
+        if (encoderPos == 10) {
+          EEPROM.write(5, 0);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Delai: 0h");
+          ecranOLED.display();
+          Serial.println("Delai: 0h");
+          delay(5000);
+        }
+        if (encoderPos == 11) {
+          EEPROM.write(5, 1);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Delai: 1h");
+          ecranOLED.display();
+          Serial.println("Delai: 1h");
+          delay(5000);
+        }
+        if (encoderPos == 12) {
+          EEPROM.write(5, 2);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Delai: 2h");
+          ecranOLED.display();
+          Serial.println("Delai: 2h");
+          delay(5000);
+        }
+        if (encoderPos == 13) {
+          EEPROM.write(5, 3);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Delai: 3h");
+          ecranOLED.display();
+          Serial.println("Delai: 3h");
+          delay(5000);
+        }
+        if (encoderPos == 14) {
+          EEPROM.write(5, 4);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Delai: 4h");
+          ecranOLED.display();
+          Serial.println("Delai: 4h");
+          delay(5000);
+        }
+        if (encoderPos == 15) {
+          EEPROM.write(5, 5);
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(1);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Delai: 30m");
+          ecranOLED.display();
+          Serial.println("Delai: 30m");
+          delay(5000);
+        }
+        resetFunc();  //call reset
+      }
       if (Mode == 11) {
         Serial.println("Essorage");  //DEBUGGING: print which mode has been selected
         ecranOLED.clearDisplay();
@@ -494,10 +704,15 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Essorage");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 2;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 12) {
@@ -509,12 +724,18 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Super Rapide 5/6min");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 3;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 13) {
@@ -526,14 +747,21 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Lavage Sportif");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         wash();
-        drain();
+        dots = 3;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 4;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 14) {
@@ -545,14 +773,21 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Allergie +");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         wash();
-        drain();
+        dots = 3;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 4;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 15) {
@@ -564,14 +799,21 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Easycare +");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
-        drain();
+        dots = 2;
+        refresh_steps();
         wash();
-        drain();
+        dots = 3;
+        refresh_steps();
         interim_spin();
         final_spin_speed_up();
         final_spin();
         final_spin_slow_down();
+        dots = 4;
+        refresh_steps();
+        test();
         End();
       }
       if (Mode == 16) {
@@ -583,13 +825,26 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Soft");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         regular_wash();
+        dots = 2;
+        refresh_steps();
         uni_toss_wash();
+        dots = 3;
+        refresh_steps();
         bi_toss_wash();
+        dots = 4;
+        refresh_steps();
         wool_wash();
-        wool_drain();
+        dots = 5;
+        refresh_steps();
         uni_toss_wash();
+        dots = 6;
+        refresh_steps();
         bi_toss_wash();
+        dots = 7;
+        refresh_steps();
         End();
       }
       if (Mode == 17) {
@@ -601,35 +856,60 @@ void rotaryMenu() {  //This handles the bulk of the menu functions without needi
         ecranOLED.println("Netoyage Tambour");
         ecranOLED.display();
         start();
+        dots = 1;
+        refresh_steps();
         wash();
+        dots = 2;
+        refresh_steps();
         wool_wash();
+        dots = 3;
+        refresh_steps();
         bi_toss_wash();
+        dots = 4;
+        refresh_steps();
         uni_toss_wash();
-        drain();
         End();
+      }
+      if (Mode == 18) {
+        if (encoderPos == 18) {
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(2);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Son: On");
+          ecranOLED.display();
+          EEPROM.write(6, 0);
+          delay(5000);
+        }
+        if (encoderPos == 19) {
+          ecranOLED.clearDisplay();
+          ecranOLED.setTextSize(2);
+          ecranOLED.setTextColor(WHITE);
+          ecranOLED.setCursor(0, 0);
+          ecranOLED.println("Son: Off");
+          ecranOLED.display();
+          EEPROM.write(6, 1);
+          delay(5000);
+          resetFunc();
+        }
       }
     }
   }
 }
 // Carry out common activities each time a setting is changed
 void start() {
-  for (int thisNote = 0; thisNote < 2; thisNote++) {
-    int noteDuration = 1000 / jingleDurations[thisNote];
-    tone(11, play_jingle[thisNote], noteDuration);
-    int pauseBetweenNotes = noteDuration * 0.8;
-    delay(pauseBetweenNotes);
-    noTone(11);
+  if (EEPROM.read(6) == 0) {
+    for (int thisNote = 0; thisNote < 2; thisNote++) {
+      int noteDuration = 1000 / jingleDurations[thisNote];
+      tone(spk, play_jingle[thisNote], noteDuration);
+      int pauseBetweenNotes = noteDuration * 0.8;
+      delay(pauseBetweenNotes);
+      noTone(spk);
+    }
   }
   EEPROM.write(1, 1);
   delay(1000);
-}
-void fill() {
-  analogWrite(pump)
-  digitalWrite(pump1in1, HIGH);
-  digitalWrite(fill_pump2, LOW);
-  delay(60000);
-  digitalWrite(fill_pump1, LOW);
-  digitalWrite(fill_pump2, LOW);
+  delay(start_delay);
 }
 void uni_toss_wash() {
   for (int i = 0; i <= 12; i++) {
@@ -668,7 +948,7 @@ void wash() {
 void regular_wash() {
   // 1 minute
   for (int i = 0; i <= 1; i++) {
-    analogWrite(10, 55);
+    analogWrite(enA, 45);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(10000);
@@ -702,45 +982,6 @@ void wool_wash() {
   digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
 }
-void initial_drain() {
-  digitalWrite(in3, HIGH);
-  delay(5000);
-  digitalWrite(in4, LOW);
-  delay(2000);
-}
-void drain() {
-  analogWrite(enB, 30);  //ENB pin
-  digitalWrite(in3, HIGH);
-  digitalWrite(in4, LOW);
-  delay(10000);
-  analogWrite(enA, 35);
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  delay(2000);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(3000);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, HIGH);
-  delay(2000);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(3000);
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  delay(2000);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(3000);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, HIGH);
-  delay(2000);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(3000);
-  digitalWrite(in3, LOW);
-  digitalWrite(in4, LOW);
-}
 void bi_toss_wash() {
   for (int i = 0; i <= 11; i++) {
     analogWrite(enA, 40);
@@ -759,83 +1000,51 @@ void bi_toss_wash() {
   }
   delay(4000);
 }
-void wool_drain() {
-  digitalWrite(in3, HIGH);
-  digitalWrite(in4, LOW);
-  delay(10000);
-  analogWrite(10, 35);  //ENB pin
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  delay(300);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(300);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, HIGH);
-  delay(300);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(300);
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-  delay(300);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(300);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, HIGH);
-  delay(300);
-  digitalWrite(in1, LOW);
-  digitalWrite(in2, LOW);
-  delay(17900);
-  digitalWrite(in3, LOW);
-  digitalWrite(in4, LOW);
-}
 void interim_spin() {
-  digitalWrite(in3, HIGH);
-  digitalWrite(in4, LOW);
+  ecranOLED.drawBitmap(
+    (ecranOLED.width() - largeurDeLimage) / 2,   // Position de l'extrême "gauche" de l'image (pour centrage écran, ici)
+    (ecranOLED.height() - hauteurDeLimage) / 2,  // Position de l'extrême "haute" de l'image (pour centrage écran, ici)
+    epd_bitmap_path12691,
+    largeurDeLimage,
+    hauteurDeLimage,
+    WHITE);
+  ecranOLED.display();
   for (int i = 10; i <= 230; i++) {
-    analogWrite(10, i);
+    analogWrite(enA, i);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(100);
   }
   delay(19900);
   for (int i = 1; i <= 230; i++) {
-    analogWrite(10, 255 - i);
+    analogWrite(enA, 255 - i);
     digitalWrite(in1, HIGH);
     digitalWrite(in2, LOW);
     delay(100);
   }
-  digitalWrite(in3, LOW);
-  digitalWrite(in4, LOW);
 }
 
 void final_spin_speed_up() {
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
   for (int i = 80; i <= 180; i++) {
-    analogWrite(10, i);
+    analogWrite(enA, i);
     delay(100);
   }
-  analogWrite(10, 181);
+  analogWrite(enA, 181);
   delay(59000);
 }
 void final_spin() {
-  digitalWrite(in3, HIGH);
-  digitalWrite(in4, LOW);
   for (int i = 181; i <= EEPROM.read(3); i++) {
-    analogWrite(10, i);
+    analogWrite(enA, i);
     delay(150);
   }
 }
 void final_spin_slow_down() {
   for (int i = 0; i <= EEPROM.read(3); i++) {
-    analogWrite(10, 255 - i);
+    analogWrite(enA, 255 - i);
     delay(120);
   }
-  digitalWrite(in3, LOW);
-  digitalWrite(in4, LOW);
   digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
 }
@@ -847,22 +1056,24 @@ void End() {
   ecranOLED.setCursor(0, 0);
   ecranOLED.println("Fin");
   ecranOLED.display();
-  for (int thisNote = 0; thisNote < 19; thisNote++) {
-    int noteDuration = 1000 / noteDurations[thisNote];
-    tone(11, end_jingle[thisNote], noteDuration);
-    int pauseBetweenNotes = noteDuration;
-    delay(pauseBetweenNotes);
-    noTone(11);
+  if (EEPROM.read(6) == 0) {
+    for (int thisNote = 0; thisNote < 19; thisNote++) {
+      int noteDuration = 1000 / noteDurations[thisNote];
+      tone(spk, end_jingle[thisNote], noteDuration);
+      int pauseBetweenNotes = noteDuration;
+      delay(pauseBetweenNotes);
+      noTone(spk);
+    }
   }
   delay(7500);
   ecranOLED.clearDisplay();
   ecranOLED.display();
   for (int thisNote = 0; thisNote < 3; thisNote++) {
     int noteDuration = 1000 / jingleDurations[thisNote];
-    tone(11, off_jingle[thisNote], noteDuration);
+    tone(spk, off_jingle[thisNote], noteDuration);
     int pauseBetweenNotes = noteDuration * 1.30;
     delay(pauseBetweenNotes);
-    noTone(11);
+    noTone(spk);
   }
   delay(3500);
   resetFunc();  //call reset
@@ -873,10 +1084,10 @@ void not_finished() {
   for (int i = 0; i <= 5; i++) {
     for (int thisNote = 0; thisNote < 3; thisNote++) {
       int noteDuration = 1000 / jingleDurations[thisNote];
-      tone(11, error_jingle[thisNote], noteDuration);
+      tone(spk, error_jingle[thisNote], noteDuration);
       int pauseBetweenNotes = noteDuration * 1.30;
       delay(pauseBetweenNotes);
-      noTone(11);
+      noTone(spk);
     }
     ecranOLED.setTextSize(1);
     ecranOLED.setTextColor(WHITE);
@@ -895,15 +1106,15 @@ void unknown_error() {
   for (int i = 0; i <= 7; i++) {
     for (int thisNote = 0; thisNote < 3; thisNote++) {
       int noteDuration = 1000 / jingleDurations[thisNote];
-      tone(11, error_jingle[thisNote], noteDuration);
+      tone(spk, error_jingle[thisNote], noteDuration);
       int pauseBetweenNotes = noteDuration * 1.30;
       delay(pauseBetweenNotes);
-      noTone(11);
+      noTone(spk);
     }
     ecranOLED.setTextSize(1);
     ecranOLED.setTextColor(WHITE);
     ecranOLED.setCursor(0, 0);
-    ecranOLED.println("Erreur inconnu, veuillez reinitialiser l'encodeur rotatif (selecteur de programe)");
+    ecranOLED.println("Erreur inconnue, veuillez reinitialiser l'encodeur rotatif (selecteur de programme)");
     ecranOLED.display();
     delay(500);
     ecranOLED.clearDisplay();
@@ -911,6 +1122,63 @@ void unknown_error() {
   }
   resetFunc();  //call reset
 }
+void refresh_steps() {
+  ecranOLED.setTextSize(1);
+  ecranOLED.setTextColor(WHITE);
+  ecranOLED.setCursor(0, 15);
+  if (dots == 1) {
+    ecranOLED.println(".");
+  } else if (dots == 2) {
+    ecranOLED.println(" .");
+  } else if (dots == 3) {
+    ecranOLED.println("  .");
+  } else if (dots == 4) {
+    ecranOLED.println("   .");
+  } else if (dots == 5) {
+    ecranOLED.println("    .");
+  } else if (dots == 6) {
+    ecranOLED.println("     .");
+  } else if (dots == 7) {
+    ecranOLED.println("      .");
+  }
+  ecranOLED.display();
+}
+void eeprom_full() {
+  Serial.println("E8");
+  ecranOLED.clearDisplay();
+  for (int i = 0; i <= 7; i++) {
+    for (int thisNote = 0; thisNote < 3; thisNote++) {
+      int noteDuration = 1000 / jingleDurations[thisNote];
+      tone(spk, error_jingle[thisNote], noteDuration);
+      int pauseBetweenNotes = noteDuration * 1.30;
+      delay(pauseBetweenNotes);
+      noTone(spk);
+    }
+    ecranOLED.setTextSize(1);
+    ecranOLED.setTextColor(WHITE);
+    ecranOLED.setCursor(0, 0);
+    ecranOLED.println("E8 - Le EEPROM (Sauvegarde) est plein, veuillez acheter un nouveau Arduino UNO des que possible");
+    ecranOLED.display();
+    delay(500);
+    ecranOLED.clearDisplay();
+    ecranOLED.display();
+  }
+  resetFunc();  //call reset
+}
+void test() {
+  for (int i = 0; i <= 10; i++) {
+    analogWrite(enA, 40);
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2, LOW);
+    delay(3000);
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+    delay(1000);
+  }
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+}
+
 //Rotary encoder interrupt service routine for one encoder pin
 void PinA() {
   cli();                                //stop interrupts happening before we read pin values
@@ -939,3 +1207,27 @@ void PinB() {
   sei();        //restart interrupts
 }
 // end of sketch!
+/*........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+.........................................................''''''''..............................'''''''''...............................'''''''..........................................................
+.....',,,',,',,'''',,,',,,,,'''.....................'',,,,,,,,,,,,,,''....................',,,',,,,,,,,,',,,''...................'',,,,,,,,,,,,,,'''...........'''',,,,,,.............',,,,'',,,........
+.....',,,,,,,,,,,,,,,,,,,,,,,,,,''...............',,,,,,,,,,,,,,,,,,,,,''..............''',,,,,,,,,,,,,,,,,,,,,''.............'',,,,,,,,,,,,,,,,,,,,,'.........',,,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,,,,,,,,,,,',,,,,,,,,,'............',,,,,,,,,,'',,,',,,,,,,,,''...........'',,,,,,,,,,,,,,,,,,,,,,,,''..........'',,,,,,,,,',,,,,'',,,,,,,,'.......'',,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,,''''''''''',,,,,,,,,,'..........',,,,,,,,,,''''''',,,,,,,,,,,'.........',,,,,,,,''........'',,,,''...........',,,,,,,,,,,''''''',,,,,,,,'''......',,,,,,,,,.............',,,,,,,,,........
+.....',',,,,,,'...........',,,,,,,,,.........'',,,,,,,,'..........',,,,,,,,,'.......',,,,,,,,'.............'''............'',,,,,,,,''..........',,,,'.........'',,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,,'...........'',,,,,,,,........',,,,,,,,'..............',,,,,,,,'......',,,,,,,,'...........................',,,,,,,,''.............''............',,,,,,,,,.............'',,,,,,,,........
+.....',,,,,,,,'...........',,,,,,,,'.......',,,,,,,,'................',,,,,,,,'.....',',,,,,,,'..........................,,,,,,,,,'............................',,,,,,,,,.............'',,,,,,,,........
+.....',,,,,,,''..........',,,,,,,,'........,,,,,,,,,.................',,,,,,','......',,,,,,,,,,'''.....................',,,,,,,,'.............................',,,,,,,,,'''''''''''''',,,,,,,,,........
+.....',,,,,,,,,,,,,',,,,,,,,,,,''..........,,,,,,,,'..................,,,,,,,,,.......',,,,,,,,,,,,,,,,,''''............',,,,,,,,..............................',,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,........
+.....',,,,,,,,,,,,,,,,,,,,,,,,,'...........',,,,,,,'..................',,,,',,,.........'',',,,,,,,,,,,,,,,,,,'.........,,,,,,,,,..............................',,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,........
+.....',,,,,,,,,,,,,,,,,,,,,,,,,,''.........,',,,,,,'..................,,,,,,,,,............'',,',,,,,,,,,,,,,,,''.......',,,,,,,,..............................',,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,........
+.....',,,,,,',''........'',,,,,,,,,'.......,,,,,,,,,..................,,,,,,,,,..................''''',,,,,,,,,,,,'.....',,,,,,,,'.............................',,,,,,,,,'''''''''''''',,,,,,,,,........
+.....',,,,,,,''............',,,,,,,,'......',,,,,,,''................',,,,,'','.........................',,,,,,,,,'.....',,,,,,,,'.............................',,,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,,..............,,,,,,,,''......',,,,,,,'...............',,,,,,',,...........................',,,,,,,,,......',,,,,,,,'............................',,,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,,.............',,,,,,,,,'......',,,,,,,,,'............',,,,,,,'''.........'''...............'',,',,,''.......,,,,,,,,,''............',''..........',,,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,''...........'',,,,,,,','.......'',,,,,,,,,'.......'',,,,,,,,,,'........',,,''''...........'''',,,,,,'........',,,,,,,,,'''......'',,,,,,''.......',,,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,,,',,,,,,,,,,,,',,,,,,,'.........'',,,,,,,,,,',,,,,,,,,,,,,,,''.......',,,,,,,,,,,'''''''',,,,,,,,,,'..........',,,,,,,,,,,,,,,,',,,,,,,,,,'......',,,,,,,,,.............',,,,,,,,,........
+.....',,,,,,,',,,,,,,,,,,,,,,,,,,,''............',,,,,,,,,,,,,,,,,,,,,,,,'..........',,,,,,,,,,,,,,,''',,,,,,,,,'.............',,,,,,,,,,,,,,,,,,,,,,,''.......',,,,,,,,,.............'',,,,,,,,........
+.....',,,,,,'',,,,,,,,',,,,,,,,''.................'',,,,,,,,,,,,,,,,,,''..............'',,,,,,,,,,,,,,,,,,,,,''.................'',,,,,,,,,,,,,,,,,,''.........',,,,,,,,,.............',,,,,,,,,........
+.....''''''''''''''''''''''''.........................'',,,,,,,,,,''......................''',,,,,,,,,,,'''........................''',,,,,,,,,'''..............'''''''''..............'''''''''........
+........................................................................................................................................................................................................*/
